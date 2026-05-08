@@ -304,21 +304,28 @@
 const CREDIT = ['エポス','三井住友','ペイディ'];
 const PAYMENTS = ['現金','PayPay','エポス','三井住友','ペイディ'];
 const DEFAULT_CATS = [
-  {id:'c1',name:'食費',color:'#e17055',emoji:'🍚'},
-  {id:'c2',name:'外食',color:'#fdcb6e',emoji:'🍜'},
-  {id:'c3',name:'交通費',color:'#74b9ff',emoji:'🚃'},
-  {id:'c4',name:'日用品',color:'#a29bfe',emoji:'🛍️'},
-  {id:'c5',name:'光熱費',color:'#55efc4',emoji:'💡'},
-  {id:'c6',name:'通信費',color:'#fd79a8',emoji:'📱'},
-  {id:'c7',name:'娯楽',color:'#ffeaa7',emoji:'🎮'},
-  {id:'c8',name:'衣服',color:'#dfe6e9',emoji:'👕'},
-  {id:'c9',name:'医療',color:'#b2bec3',emoji:'💊'},
-  {id:'c10',name:'美容',color:'#fab1d3',emoji:'💄'},
-  {id:'c11',name:'教育',color:'#81ecec',emoji:'📚'},
-  {id:'c12',name:'その他',color:'#636e72',emoji:'📦'},
+  {id:'c1',name:'食費',color:'#e17055',emoji:''},
+  {id:'c2',name:'外食',color:'#fdcb6e',emoji:''},
+  {id:'c3',name:'交通費',color:'#74b9ff',emoji:''},
+  {id:'c4',name:'日用品',color:'#a29bfe',emoji:''},
+  {id:'c5',name:'光熱費',color:'#55efc4',emoji:''},
+  {id:'c6',name:'通信費',color:'#fd79a8',emoji:''},
+  {id:'c7',name:'娯楽',color:'#ffeaa7',emoji:''},
+  {id:'c8',name:'衣服',color:'#dfe6e9',emoji:''},
+  {id:'c9',name:'医療',color:'#b2bec3',emoji:''},
+  {id:'c10',name:'美容',color:'#fab1d3',emoji:''},
+  {id:'c11',name:'教育',color:'#81ecec',emoji:''},
+  {id:'c12',name:'その他',color:'#636e72',emoji:''},
 ];
-const COLORS = ['#e17055','#fdcb6e','#74b9ff','#a29bfe','#55efc4','#fd79a8','#6c5ce7','#00b894','#ffeaa7','#dfe6e9','#b2bec3','#636e72','#d63031','#00cec9','#e84393'];
-const EMOJIS = ['🍚','🍜','🍕','🍺','🍭','☕','🚃','🚗','✈️','🏠','💡','📱','💊','💄','👕','🎮','📚','🎵','⚽','🐾','🌺','🎊','💰','📦'];
+const COLORS = [
+  '#e17055','#d63031','#ff7675','#e84393','#fd79a8','#fab1d3',
+  '#fdcb6e','#f9ca24','#f0932b','#e55039','#badc58','#6ab04c',
+  '#00b894','#55efc4','#81ecec','#00cec9','#74b9ff','#0984e3',
+  '#6c5ce7','#a29bfe','#fd79a8','#e056fd','#be2edd','#9b59b6',
+  '#dfe6e9','#b2bec3','#636e72','#2d3436','#f5f6fa','#718093',
+  '#ffeaa7','#f6e58d','#c7ecee','#95afc0','#22a6b3','#30336b',
+];
+const EMOJIS = [];
 
 /* ══════════════════════════════════════════
    UTILS
@@ -484,7 +491,9 @@ function txItem(t, cats) {
   const dateDisp = t.date.slice(5).replace('-','/');
   return `
     <div class="list-item" onclick="editTx('${t.id}')">
-      <div class="item-icon" style="background:${cat?cat.color+'22':'#ffffff11'}">${cat?cat.emoji:'📦'}</div>
+      <div class="item-icon" style="background:${cat?cat.color+'22':'#ffffff11'}">
+        <div style="width:14px;height:14px;border-radius:50%;background:${cat?cat.color:'#636e72'}"></div>
+      </div>
       <div class="item-info">
         <div class="item-name">${cat?cat.name:'その他'}${t.memo?' · '+t.memo:''}</div>
         <div class="item-sub">${dateDisp}（${dayOfWeek(t.date)}） ${pillHtml}</div>
@@ -538,7 +547,7 @@ function renderAdd() {
           <div class="chip ${f.cat===c.id?'sel':''}"
             onclick="setCat('${c.id}')"
             style="${f.cat===c.id?`background:${c.color};border-color:${c.color}`:''}">
-            ${c.emoji} ${c.name}
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c.color};margin-right:5px;vertical-align:middle"></span>${c.name}
           </div>`).join('')}
       </div>
     </div>
@@ -642,7 +651,9 @@ function renderHistory() {
       ${fixed.map(f=>{
         const cat = cats.find(c=>c.id===f.category);
         return `<div class="list-item" onclick="showFixedModal(${JSON.stringify(f).replace(/"/g,'&quot;')})">
-          <div class="item-icon" style="background:${cat?cat.color+'22':'#ffffff11'}">${cat?cat.emoji:'🏠'}</div>
+          <div class="item-icon" style="background:${cat?cat.color+'22':'#ffffff11'}">
+            <div style="width:14px;height:14px;border-radius:50%;background:${cat?cat.color:'#636e72'}"></div>
+          </div>
           <div class="item-info">
             <div class="item-name">${f.name}</div>
             <div class="item-sub">毎月${f.day}日 <span class="pill pill-cash">${f.payment||'口座振替'}</span></div>
@@ -692,8 +703,8 @@ function renderSettings() {
       <div class="section-title">カテゴリ</div>
       ${cats.map(c=>`
         <div class="settings-item" onclick="showCatModal(${JSON.stringify(c).replace(/"/g,'&quot;')})">
-          <div style="width:12px;height:12px;border-radius:50%;background:${c.color};margin-right:12px;flex-shrink:0"></div>
-          <div class="si-info"><div class="si-name">${c.emoji} ${c.name}</div></div>
+          <div style="width:16px;height:16px;border-radius:50%;background:${c.color};margin-right:12px;flex-shrink:0"></div>
+          <div class="si-info"><div class="si-name">${c.name}</div></div>
           <div style="color:var(--text-3);font-size:14px">›</div>
         </div>`).join('')}
       <button class="btn-add" onclick="showCatModal(null)">＋ カテゴリを追加</button>
@@ -792,13 +803,6 @@ function showCatModal(c) {
       <input type="text" class="form-input" id="cat-name" value="${c.name}" placeholder="カテゴリ名">
     </div>
     <div class="form-group">
-      <label class="form-label">絵文字</label>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">
-        ${EMOJIS.map(e=>`<div class="emoji-btn ${c.emoji===e?'sel':''}" onclick="pickEmoji('${e}',this)">${e}</div>`).join('')}
-      </div>
-      <input type="hidden" id="cat-emoji" value="${c.emoji}">
-    </div>
-    <div class="form-group">
       <label class="form-label">カラー</label>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
         ${COLORS.map(col=>`<div class="color-swatch ${c.color===col?'sel':''}" style="background:${col}" onclick="pickColor('${col}',this)"></div>`).join('')}
@@ -821,7 +825,7 @@ function pickColor(col,el) {
 }
 function saveCat(id) {
   const name  = document.getElementById('cat-name').value.trim();
-  const emoji = document.getElementById('cat-emoji').value;
+  const emoji = '';
   const color = document.getElementById('cat-color').value;
   if (!name) { alert('カテゴリ名を入力してください'); return; }
   const cats = db.cats();
