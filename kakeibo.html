@@ -230,8 +230,13 @@ const monthLabel=s=>{const[y,m]=s.split('-');return`${y}年${Number(m)}月`};
 const shortMonth=s=>{const[,m]=s.split('-');return`${Number(m)}月`};
 const addMonths=(s,n)=>{const[y,m]=s.split('-').map(Number);const d=new Date(y,m-1+n,1);return`${d.getFullYear()}-${pad(d.getMonth()+1)}`};
 const accountingMonth=(dateStr,payment)=>{
-  const[y,m]=dateStr.split('-').map(Number);
-  if(isCredit(payment)){const d=new Date(y,m,1);return`${d.getFullYear()}-${pad(d.getMonth()+1)}`}
+  const[y,m,d]=dateStr.split('-').map(Number);
+  if(isCredit(payment)){
+    // 締め日24日：25日以降は翌々月、24日以前は翌月に計上
+    const offset=d>=25?2:1;
+    const dt=new Date(y,m-1+offset,1);
+    return`${dt.getFullYear()}-${pad(dt.getMonth()+1)}`;
+  }
   return`${y}-${pad(m)}`;
 };
 const dayOfWeek=s=>['日','月','火','水','木','金','土'][new Date(s).getDay()];
@@ -778,6 +783,17 @@ function deleteCat(id){
 function showModal(html){document.getElementById('modal-body').innerHTML=html;document.getElementById('modal-overlay').classList.add('show')}
 function closeModal(){document.getElementById('modal-overlay').classList.remove('show')}
 
+function migrateData(){
+  const txs=db.txs();let changed=false;
+  for(const t of txs){
+    if(t.type==='expense'&&isCredit(t.payment)){
+      const correct=accountingMonth(t.date,t.payment);
+      if(t.accountingMonth!==correct){t.accountingMonth=correct;changed=true;}
+    }
+  }
+  if(changed)db.saveTx(txs);
+}
+migrateData();
 renderAll();
 </script>
 </body>
