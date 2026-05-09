@@ -852,11 +852,50 @@ function renderHistory(){
   const cur=curMonth();
   const activFixed=db.fixed().filter(f=>!f.startMonth||m>=f.startMonth);
   const activSal=db.salaries().filter(s=>!s.startMonth||m>=s.startMonth);
-  const txs=db.txs().filter(t=>t.accountingMonth===m).sort((a,b)=>b.date.localeCompare(a.date));
+
+  // 表示する明細：
+  // クレカ → 使用月（purchaseMonth）で表示
+  // 現金・PayPay・収入 → 支払月（accountingMonth）で表示
+  const txs = db.txs().filter(t => {
+    if(t.type==='income') return t.accountingMonth===m;
+    if(isCredit(t.payment)) return ymOf(t.date)===m; // 使用月
+    return t.accountingMonth===m; // 現金・PayPay
+  }).sort((a,b)=>b.date.localeCompare(a.date));
+
+  // 支払月に届くクレカ集計（先月以前に使ったもので今月が支払月）
+  const creditSummaries = {};
+  for(const t of db.txs()){
+    if(t.type==='income') continue;
+    if(!isCredit(t.payment)) continue;
+    if(t.accountingMonth!==m) continue;      // この月が支払月
+    if(ymOf(t.date)===m) continue;           // 同月使用は除外（上で表示済み）
+    if(!creditSummaries[t.payment]) creditSummaries[t.payment]=0;
+    creditSummaries[t.payment]+=t.amount;
+  }
+
   const groups={};
   for(const t of txs){if(!groups[t.date])groups[t.date]=[];groups[t.date].push(t);}
-  const totalExp=txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0)+activFixed.reduce((s,f)=>s+f.amount,0);
-  const totalInc=txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0)+activSal.reduce((s,sl)=>s+sl.amount,0);
+
+  const totalExp = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0)
+    + activFixed.reduce((s,f)=>s+f.amount,0)
+    + Object.values(creditSummaries).reduce((s,v)=>s+v,0);
+  const totalInc = txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0)
+    + activSal.reduce((s,sl)=>s+sl.amount,0);
+
+  // クレカ支払い集計行HTML
+  const creditSummaryHtml = Object.entries(creditSummaries).map(([card, amount])=>{
+    const payD = creditPayDate(m);
+    return`<div class="list-item" style="cursor:default;border-color:rgba(225,112,85,0.3)">
+      <div class="item-icon" style="background:rgba(225,112,85,0.12)">
+        <div style="width:14px;height:14px;border-radius:50%;background:var(--red)"></div>
+      </div>
+      <div class="item-info">
+        <div class="item-name">💳 ${card}（先月分引き落とし）</div>
+        <div class="item-sub">${payD.slice(5).replace('-','/')}（${dayOfWeek(payD)}）<span class="pill pill-card">${card}</span></div>
+      </div>
+      <div class="item-amount exp">-¥${fmt(amount)}</div>
+    </div>`;
+  }).join('');
 
   document.getElementById('history-body').innerHTML=`
     <div class="page-header"><div class="page-title">明細</div></div>
@@ -869,16 +908,21 @@ function renderHistory(){
       <div class="widget" style="flex:1"><div class="w-label">支出合計</div><div class="w-amount red">¥${fmt(totalExp)}</div></div>
       <div class="widget" style="flex:1"><div class="w-label">収入合計</div><div class="w-amount green">¥${fmt(totalInc)}</div></div>
     </div>
-    ${activSal.length>0?`<div class="section-title">毎月の給与</div>${activSal.map(s=>`
-      <div class="list-item" onclick="showSalaryModal(${JSON.stringify(s).replace(/"/g,'&quot;')})">
+
+    ${activSal.length>0?`<div class="section-title">毎月の給与</div>${activSal.map(s=>{
+      const [sy,sm]=m.split('-').map(Number);
+      const payD=nextBizDay(sy,sm,s.day);
+      return`<div class="list-item" onclick="showSalaryModal(${JSON.stringify(s).replace(/"/g,'&quot;')})">
         <div class="item-icon" style="background:rgba(0,184,148,0.15)">
           <div style="width:14px;height:14px;border-radius:50%;background:var(--green)"></div>
         </div>
         <div class="item-info"><div class="item-name">${s.name}</div>
-          <div class="item-sub">毎月${nextBizDay(...`${m}-${pad(s.day)}`.split('-').map(Number)).slice(8)}日（実際：${nextBizDay(...(`${m}-${pad(s.day)}`).split('-').map(Number)).slice(5).replace('-','/')}（${dayOfWeek(nextBizDay(parseInt(m),parseInt(m.split('-')[1]),s.day))}））</div>
+          <div class="item-sub">${payD.slice(5).replace('-','/')}（${dayOfWeek(payD)}）入金</div>
         </div>
         <div class="item-amount inc">+¥${fmt(s.amount)}</div>
-      </div>`).join('')}`:''}
+      </div>`;
+    }).join('')}`:''}
+
     ${activFixed.length>0?`<div class="section-title">固定費（毎月）</div>${activFixed.map(f=>{
       const cat=cats.find(c=>c.id===f.category);
       const [fy,fm]=m.split('-').map(Number);
@@ -893,12 +937,17 @@ function renderHistory(){
         <div class="item-amount exp">-¥${fmt(f.amount)}</div>
       </div>`;
     }).join('')}`:''}
+
+    ${Object.keys(creditSummaries).length>0?`<div class="section-title">クレカ引き落とし（先月分）</div>${creditSummaryHtml}`:''}
+
     ${Object.keys(groups).sort((a,b)=>b.localeCompare(a)).map(date=>`
       <div class="day-group">
         <div class="day-label">${date.slice(5).replace('-','/')}（${dayOfWeek(date)}）</div>
         ${groups[date].map(t=>txItem(t,cats)).join('')}
       </div>`).join('')}
-    ${txs.length===0&&activFixed.length===0?`<div class="empty"><div class="ico">📭</div>この月の明細はありません</div>`:''}
+
+    ${txs.length===0&&activFixed.length===0&&Object.keys(creditSummaries).length===0
+      ?`<div class="empty"><div class="ico">📭</div>この月の明細はありません</div>`:''}
   `;
 }
 
