@@ -449,8 +449,81 @@ function nextPreview(m) {
 }
 
 /* ══════════════════════════════════════
-   ANNUAL SUMMARY（実績ベース）
-   固定費・給与は startMonth〜min(今月,年末) の月数分だけ計上
+   PIE CHART
+══════════════════════════════════════ */
+function buildPie(catMap, cats, total) {
+  if(!total || total === 0) return '<div style="text-align:center;color:var(--text-3);padding:24px;font-size:13px">データがありません</div>';
+
+  // Sort by amount desc, take top 8, rest → その他
+  const entries = cats.filter(c=>catMap[c.id]>0)
+    .map(c=>({name:c.name,color:c.color,amount:catMap[c.id]||0}))
+    .sort((a,b)=>b.amount-a.amount);
+
+  const top = entries.slice(0,8);
+  const rest = entries.slice(8).reduce((s,e)=>s+e.amount,0);
+  if(rest>0) top.push({name:'その他',color:'#636e72',amount:rest});
+
+  // SVG pie
+  const cx=80, cy=80, r=70, gap=0.02;
+  let angle=-Math.PI/2;
+  let slices='';
+  for(const e of top) {
+    const pct=e.amount/total;
+    const sweep=pct*Math.PI*2-gap;
+    if(sweep<=0) continue;
+    const x1=cx+r*Math.cos(angle);
+    const y1=cy+r*Math.sin(angle);
+    const x2=cx+r*Math.cos(angle+sweep);
+    const y2=cy+r*Math.sin(angle+sweep);
+    const large=sweep>Math.PI?1:0;
+    slices+=`<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z" fill="${e.color}" opacity="0.9"/>`;
+    angle+=pct*Math.PI*2;
+  }
+
+  // Legend
+  const legend = top.map(e=>{
+    const pct=Math.round(e.amount/total*100);
+    return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+      <div style="width:10px;height:10px;border-radius:50%;background:${e.color};flex-shrink:0"></div>
+      <div style="flex:1;font-size:12px;color:var(--text)">${e.name}</div>
+      <div style="font-size:12px;font-weight:700;color:var(--text-2)">${pct}%</div>
+      <div style="font-size:12px;font-weight:700;color:var(--text);min-width:70px;text-align:right">¥${fmt(e.amount)}</div>
+    </div>`;
+  }).join('');
+
+  return`<div style="display:flex;gap:16px;align-items:flex-start">
+    <svg viewBox="0 0 160 160" width="140" height="140" style="flex-shrink:0">
+      ${slices}
+      <circle cx="${cx}" cy="${cy}" r="32" fill="#1e2235"/>
+      <text x="${cx}" y="${cy-6}" fill="#8892aa" font-size="9" text-anchor="middle" font-family="sans-serif">合計</text>
+      <text x="${cx}" y="${cy+8}" fill="#f0f0fa" font-size="10" font-weight="bold" text-anchor="middle" font-family="sans-serif">¥${total>=10000?Math.round(total/10000)+'万':fmt(total)}</text>
+    </svg>
+    <div style="flex:1;padding-top:4px">${legend}</div>
+  </div>`;
+}
+
+let _pieMode='out';
+let _pieCatMap={out:null,spent:null};
+function setPieTab(mode){
+  _pieMode=mode;
+  document.getElementById('pie-tab-out').style.background=mode==='out'?'var(--accent)':'var(--card2)';
+  document.getElementById('pie-tab-out').style.color=mode==='out'?'white':'var(--text-2)';
+  document.getElementById('pie-tab-spent').style.background=mode==='spent'?'var(--accent)':'var(--card2)';
+  document.getElementById('pie-tab-spent').style.color=mode==='spent'?'white':'var(--text-2)';
+  const cats=db.cats();
+  if(mode==='out'){
+    const total=Object.values(_pieCatMap.out).reduce((s,v)=>s+v,0);
+    document.getElementById('pie-container').innerHTML=buildPie(_pieCatMap.out,cats,total);
+  } else {
+    const total=Object.values(_pieCatMap.spent).reduce((s,v)=>s+v,0);
+    document.getElementById('pie-container').innerHTML=buildPie(_pieCatMap.spent,cats,total);
+  }
+}
+
+
+/* ══════════════════════════════════════
+   ANNUAL SUMMARY
+   固定費・給与は開始月〜今月の実績分のみ計上
 ══════════════════════════════════════ */
 function annualSummary(year) {
   const cur = curMonth();
@@ -550,6 +623,10 @@ function renderHome(){
   const payDate = creditPayDate(m);
   const payDateDisp = payDate.slice(5).replace('-','/')+'（'+dayOfWeek(payDate)+'）';
 
+  // 円グラフ用にcatMapを保存
+  _pieCatMap = {out: out.catMap, spent: spent.catMap};
+  _pieMode = 'out';
+
   document.getElementById('home-body').innerHTML=`
     <div class="page-header">
       <div class="page-title">家計簿</div>
@@ -635,6 +712,21 @@ function renderHome(){
         </div>`;
       }).join('')}
     </div>`:''}
+
+    <div class="section-title">カテゴリ別内訳</div>
+    <div class="widget wide" style="padding:18px 16px;margin-bottom:0">
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button id="pie-tab-out" onclick="setPieTab('out')"
+          style="flex:1;padding:8px;border:none;border-radius:10px;font-family:'Noto Sans JP',sans-serif;font-size:12px;font-weight:700;cursor:pointer;background:var(--accent);color:white">
+          💳 口座出金
+        </button>
+        <button id="pie-tab-spent" onclick="setPieTab('spent')"
+          style="flex:1;padding:8px;border:none;border-radius:10px;font-family:'Noto Sans JP',sans-serif;font-size:12px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--text-2)">
+          🛒 購買（使用日）
+        </button>
+      </div>
+      <div id="pie-container">${buildPie(out.catMap, cats, out.totalOut)}</div>
+    </div>
 
     <div class="section-title">最近の明細</div>
     ${recentTx.length===0?`<div class="empty"><div class="ico">📊</div>まだ明細がありません</div>`:recentTx.map(t=>txItem(t,cats)).join('')}
