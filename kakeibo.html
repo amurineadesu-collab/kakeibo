@@ -418,7 +418,7 @@ function summaryOut(m) {
     else directExp+=t.amount;
     catMap[t.category]=(catMap[t.category]||0)+t.amount;
   }
-  for(const f of db.fixed())   { if(!f.startMonth||m>=f.startMonth){fixedExp+=f.amount;} }
+  for(const f of db.fixed())   { if(!f.startMonth||m>=f.startMonth){ fixedExp+=f.amount; catMap[f.category]=(catMap[f.category]||0)+f.amount; } }
   for(const s of db.salaries()){ if(!s.startMonth||m>=s.startMonth){salaryInc+=s.amount;} }
   return {creditExp,directExp,fixedExp,salaryInc,manualInc,
     totalIncome:manualInc+salaryInc, totalOut:creditExp+directExp+fixedExp, catMap};
@@ -451,7 +451,8 @@ function nextPreview(m) {
 /* ══════════════════════════════════════
    PIE CHART
 ══════════════════════════════════════ */
-function buildPie(catMap, cats, total) {
+function buildPie(catMap, cats, _ignored) {
+  const total = Object.values(catMap).reduce((s,v)=>s+v, 0);
   if(!total || total === 0) return '<div style="text-align:center;color:var(--text-3);padding:24px;font-size:13px">データがありません</div>';
 
   // Sort by amount desc, take top 8, rest → その他
@@ -512,11 +513,9 @@ function setPieTab(mode){
   document.getElementById('pie-tab-spent').style.color=mode==='spent'?'white':'var(--text-2)';
   const cats=db.cats();
   if(mode==='out'){
-    const total=Object.values(_pieCatMap.out).reduce((s,v)=>s+v,0);
-    document.getElementById('pie-container').innerHTML=buildPie(_pieCatMap.out,cats,total);
+    document.getElementById('pie-container').innerHTML=buildPie(_pieCatMap.out,cats,0);
   } else {
-    const total=Object.values(_pieCatMap.spent).reduce((s,v)=>s+v,0);
-    document.getElementById('pie-container').innerHTML=buildPie(_pieCatMap.spent,cats,total);
+    document.getElementById('pie-container').innerHTML=buildPie(_pieCatMap.spent,cats,0);
   }
 }
 
@@ -718,11 +717,11 @@ function renderHome(){
       <div style="display:flex;gap:8px;margin-bottom:14px">
         <button id="pie-tab-out" onclick="setPieTab('out')"
           style="flex:1;padding:8px;border:none;border-radius:10px;font-family:'Noto Sans JP',sans-serif;font-size:12px;font-weight:700;cursor:pointer;background:var(--accent);color:white">
-          💳 口座出金
+          今月 口座から出ていくお金
         </button>
         <button id="pie-tab-spent" onclick="setPieTab('spent')"
           style="flex:1;padding:8px;border:none;border-radius:10px;font-family:'Noto Sans JP',sans-serif;font-size:12px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--text-2)">
-          🛒 購買（使用日）
+          今月実際に使った金額
         </button>
       </div>
       <div id="pie-container">${buildPie(out.catMap, cats, out.totalOut)}</div>
